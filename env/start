@@ -1,0 +1,4 @@
+#!/bin/bash
+export OPATH=$PATH
+export PATH=${PATH}:$(pwd)/env/bin
+export MCSL_WORKING_DIRECTORY=$(pwd)

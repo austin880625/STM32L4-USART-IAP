@@ -1,0 +1,16 @@
+#!/bin/bash
+NAME=$1
+if [ -e ${NAME}/report/template.pdf ]; then
+    rm -rf ${MCSL_WORKING_DIRECTORY}/env/tmp
+    mkdir ${MCSL_WORKING_DIRECTORY}/env/tmp
+    cp -r ${MCSL_WORKING_DIRECTORY}/${NAME} ${MCSL_WORKING_DIRECTORY}/env/tmp/
+    mv ${MCSL_WORKING_DIRECTORY}/env/tmp/${NAME}/report ${MCSL_WORKING_DIRECTORY}/env/tmp/${NAME}/report_dir
+    mv ${MCSL_WORKING_DIRECTORY}/env/tmp/${NAME}/report_dir/template.pdf ${MCSL_WORKING_DIRECTORY}/env/tmp/${NAME}/report.pdf
+    rm -rf ${MCSL_WORKING_DIRECTORY}/env/tmp/${NAME}/report_dir
+    cd ${MCSL_WORKING_DIRECTORY}/env/tmp/
+    zip -r ${MCSL_WORKING_DIRECTORY}/${NAME}.zip ${NAME}
+    cd ${MCSL_WORKING_DIRECTORY}
+    rm -rf ${MCSL_WORKING_DIRECTORY}/env/tmp
+else
+    echo "It seems that you didn't do the report yet?"
+fi

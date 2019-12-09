@@ -1,0 +1,24 @@
+#!/bin/bash
+TEMPLATE="lab"
+PROJECT_LIST=()
+while getopts "t:p:" arg ; do
+    case "${arg}" in
+        t)
+            TEMPLATE=${OPTARG}
+            ;;
+        p)
+            PROJECT_LIST+=(${OPTARG})
+            ;;
+    esac
+done
+shift "$((OPTIND-1))"
+NAME=$@
+if [ ${#PROJECT_LIST[@]} -eq 0 ]; then
+    cp -r ${MCSL_WORKING_DIRECTORY}/env/template/${TEMPLATE} $(pwd)/${NAME}
+else
+    mkdir $(pwd)/${NAME}
+    for project in ${PROJECT_LIST[@]}
+    do
+        cp -r ${MCSL_WORKING_DIRECTORY}/env/template/${TEMPLATE} $(pwd)/${NAME}/${project}
+    done
+fi
