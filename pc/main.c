@@ -4,6 +4,7 @@
 #include <termios.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdint.h>
 
 int open_port(const char *src) {
 	int fd = open(src, O_RDWR | O_NOCTTY | O_NDELAY);
@@ -41,13 +42,13 @@ int send_source(int fd, char *filename) {
 		printf("Open source file error!\n");
 		exit(1);
 	}
-	unsigned int checksum = 0;
-	static char buf[MAX_LEN];
-	char *ptr = buf;
+	uint32_t checksum = 0;
+	static uint8_t buf[MAX_LEN];
+	uint8_t *ptr = buf;
 	memset(buf, 0, sizeof(buf));
 	int len = 0;
 	while (1) {
-		size_t sz = fread(ptr, sizeof(char), 1024, src);
+		size_t sz = fread(ptr, sizeof(uint8_t), 1024, src);
 		len += sz;
 		if (sz != 1024)
 			break;
@@ -57,21 +58,38 @@ int send_source(int fd, char *filename) {
 	while (len % 4) len++;
 	ptr = buf;
 	while (ptr - buf < len) {
-		unsigned int tmp = 0;
+		uint32_t tmp = 0;
 		for (int i = 0 ; i < 4 ; i++) {
-			tmp <<= 8;
-			tmp |= ptr[i];
+			tmp |= ((uint32_t)ptr[i] << ((3-i) * 8));
 		}
 		checksum += tmp;
 		ptr += 4;
 	}
-	write(fd, &checksum, sizeof(checksum));
-	printf("checksum: %d\n", checksum);
-	write(fd, buf, sizeof(char) * len);
+	for(int i=0; i<4; i++) {
+		uint8_t part = checksum >> ((3-i)*8);
+		write(fd, &part, sizeof(uint8_t));
+	}
+	printf("checksum: %u %u %u %u %u\n", checksum, (checksum & 0xFF), ((checksum >> 8) & 0xFF), ((checksum >> 16) & 0xFF), ((checksum >> 24) & 0xFF));
+	for(int i=0; i<len; i++) {
+		//int kkk;
+		//scanf("%d", &kkk);
+		write(fd, &buf[i], sizeof(uint8_t));
+		//printf("a byte is sent\n");
+	}
 	puts("write done");
-	read(fd, buf, sizeof(char));
-	printf("get return code: %d\n", buf[0]);
-	return buf[0];
+	uint32_t ret_checksum = 0;
+	for(int i=0; i<1; i++) {
+		uint8_t part = 0;
+		read(fd, &part, sizeof(uint8_t));
+		ret_checksum |= (uint32_t)part << (8 * i);
+	}
+	printf("get return code: %u\n", ret_checksum);
+	if(ret_checksum == 0) {
+		printf("Code is correct\n");
+	} else {
+		printf("Corrupted, trying to resend\n");
+	}
+	return ret_checksum;
 }
 int main(int argc, char **argv) {
 	if (argc != 2) {
