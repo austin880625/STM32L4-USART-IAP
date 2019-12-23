@@ -2,6 +2,7 @@
 
 #define base16m_encode(x) (x + 'A')
 #define base16m_decode(bs) (((bs[0]-'A')<<4) | (bs[1]-'A'))
+#define USART_TIMEOUT 1310720
 
 inline void usart_send_byte(uint8_t x) {
 	uint8_t bl = (x >> 4), br = x & 0x0F;
@@ -43,11 +44,11 @@ uint32_t usart_receive(uint8_t *data, uint32_t len) {
 				received = 1;
 			}
 			wait_cnt++;
-			if(wait_cnt > 8192) {
+			if(wait_cnt > USART_TIMEOUT) {
 				break;
 			}
 		}
-		if(wait_cnt > 8192) break;
+		if(wait_cnt > USART_TIMEOUT) break;
 		wait_cnt = received = 0;
 		while(!received) {
 			if(USART1->ISR & USART_ISR_RXNE) {
@@ -56,11 +57,11 @@ uint32_t usart_receive(uint8_t *data, uint32_t len) {
 				received = 1;
 			}
 			wait_cnt++;
-			if(wait_cnt > 8192) {
+			if(wait_cnt > USART_TIMEOUT) {
 				break;
 			}
 		}
-		if(wait_cnt > 8192) break;
+		if(wait_cnt > USART_TIMEOUT) break;
 		data[ptr++] = base16m_decode(bs);
 	}
 	return ptr;
