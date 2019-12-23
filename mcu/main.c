@@ -87,10 +87,12 @@ void USART1_Handler() {
 	USART1->TDR = (uint8_t)(checksum_self & 0xFF);
 	*/
 	if(checksum == checksum_self) {
+		while(!(USART1->ISR & USART_ISR_TXE));
 		USART1->TDR = '\0';
 		flash_write((uint32_t *)usart_buf, ptr);
 		program_ready = 1;
 	} else {
+		while(!(USART1->ISR & USART_ISR_TXE));
 		USART1->TDR = 0x01;
 		NVIC->ISER[1] |= 0x20;
 	}
