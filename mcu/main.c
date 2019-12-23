@@ -1,4 +1,5 @@
-#include "inc/stm32l476xx.h"
+#include "inc/stm/stm32l476xx.h"
+#include "inc/io/usart.h"
 
 // use this pragma at handlers
 //#pragma thumb
@@ -47,53 +48,19 @@ void flash_write(uint32_t *data, uint32_t n) {
 void USART1_Handler() {
 	NVIC->ICPR[1] = 0x20;
 	NVIC->ICER[1] = 0x20;
-	uint32_t checksum = 0;
-	for(int i=4; i; i--) {
-		while(!(USART1->ISR & USART_ISR_RXNE));
-		uint8_t c = USART1->RDR;
-		checksum <<= 8;
-		checksum |= (uint32_t)c;
+	uint32_t checksum = usart_recieve_uint(), checksum_self = 0;
+	uint32_t size = usart_recieve(usart_buf, 8192);
+	while(size) {
+		checksum_self += usart_checksum(usart_buf, size);
+		size = usart_recieve(usart_buf, 8192);
 	}
-	uint32_t wait_cnt = 0, ptr = 0, checksum_self = 0;
-	while(1) {
-		if(USART1->ISR & USART_ISR_RXNE) {
-			wait_cnt = 0;
-			usart_buf[ptr++] = USART1->RDR;
-			if((ptr & 0x03) == 0) {
-				uint32_t delta = 0;
-				for(int i=4; i; i--) {
-					delta <<= 8;
-					delta |= (uint32_t)usart_buf[ptr-i];
-				}
-				checksum_self += delta;
-			}
-		}
-		wait_cnt++;
-		if(wait_cnt > 8192) {
-			break;
-		}
-	}
-	/*
-	while(!(USART1->ISR & USART_ISR_TXE));
-	USART1->TDR = (uint8_t)(checksum_self & 0xFF);
-	checksum_self >>= 8;
-	while(!(USART1->ISR & USART_ISR_TXE));
-	USART1->TDR = (uint8_t)(checksum_self & 0xFF);
-	checksum_self >>= 8;
-	while(!(USART1->ISR & USART_ISR_TXE));
-	USART1->TDR = (uint8_t)(checksum_self & 0xFF);
-	checksum_self >>= 8;
-	while(!(USART1->ISR & USART_ISR_TXE));
-	USART1->TDR = (uint8_t)(checksum_self & 0xFF);
-	*/
+	usart_send_uint(checksum);
 	if(checksum == checksum_self) {
-		while(!(USART1->ISR & USART_ISR_TXE));
-		USART1->TDR = '\0';
-		flash_write((uint32_t *)usart_buf, ptr);
+		usart_send_uint(0);
+		flash_write((uint32_t *)usart_buf, size);
 		program_ready = 1;
 	} else {
-		while(!(USART1->ISR & USART_ISR_TXE));
-		USART1->TDR = 0x01;
+		usart_send_uint(1);
 		NVIC->ISER[1] |= 0x20;
 	}
 }
