@@ -58,14 +58,16 @@ void USART1_Handler() {
 		checksum_self += usart_checksum(usart_buf + program_size, size);
 	}
 	usart_send_uint(checksum);
+	usart_send_uint(checksum_self);
 	if(checksum == checksum_self && size == size_self) {
 		program_size += size;
 		if(size == 0) {
 			flash_write((uint32_t *)usart_buf, program_size);
 			program_ready = 1;
+		} else {
+			NVIC->ISER[1] |= 0x20;
 		}
 		usart_send_uint(0);
-		NVIC->ISER[1] |= 0x20;
 	} else {
 		usart_send_uint(1);
 		NVIC->ISER[1] |= 0x20;
@@ -107,6 +109,8 @@ int main() {
 	uint32_t *new_vtor = VTOR_BASE_ADDR + 1;
 	void (*fn)() = *((void (**)())(new_vtor));
 	fn();
+	NVIC->ISER[1] |= 0x20;
+	NVIC->ICPR[1] = 0x20;
 	while(1);
 
 	return 0;
