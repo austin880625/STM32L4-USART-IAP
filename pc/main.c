@@ -1,7 +1,7 @@
 #include "pc.h"
 
 #define MAX_LEN 65536
-#define MAX_PACKET 64
+#define MAX_PACKET 1024
 int load_source(char *filename, uint8_t *buf, uint32_t *len) {
 	FILE *src;
 	if (!(src = fopen(filename, "rb")))
@@ -27,27 +27,30 @@ int cnt = 0;
 int send_packet(int fd, uint8_t *buf, uint32_t sz) {
 	printf("send packet %d(%d bytes)\n", cnt, sz);
 	uint8_t *ptr = buf;
-	uint32_t checksum = sz;
+	uint32_t local_checksum = sz;
 	while (ptr - buf < sz) {
 		uint32_t tmp = 0;
 		for (int i = 0 ; i < 4 ; i++)
 			tmp |= ((uint32_t)ptr[i] << ((3 - i) * 8));
-		checksum += tmp;
+		local_checksum += tmp;
 		ptr += 4;
 	}
 	printf("local  checksum: ");
-	print(checksum);
-	send_int(fd, checksum);
+	print(local_checksum);
+	send_int(fd, local_checksum);
 	send_int(fd, sz);
 	ptr = buf;
 	while (ptr - buf < sz)
 		send_byte(fd, *ptr), ptr++;
-	uint32_t ret_checksum = receive_int(fd);
+	uint32_t return_checksum = receive_int(fd);
+	printf("return checksum: ");
+	print(return_checksum);
+	uint32_t remote_checksum = receive_int(fd);
 	printf("remote checksum: ");
-	print(ret_checksum);
-	uint32_t ret = receive_int(fd);
-	printf("get return code: %u\n", ret);
-	return ret;
+	print(remote_checksum);
+	uint32_t return_code = receive_int(fd);
+	printf("get return code: %u\n", return_code);
+	return return_code;
 }
 void send_source(int fd, char *filename) {
 	static uint8_t buf[MAX_LEN];
