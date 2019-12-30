@@ -1,7 +1,7 @@
 #include "pc.h"
 
 #define MAX_LEN 65536
-#define MAX_PACKET 1024
+#define MAX_PACKET 64
 int load_source(char *filename, uint8_t *buf, uint32_t *len) {
 	FILE *src;
 	if (!(src = fopen(filename, "rb")))
@@ -29,10 +29,7 @@ int send_packet(int fd, uint8_t *buf, uint32_t sz) {
 	uint8_t *ptr = buf;
 	uint32_t local_checksum = sz;
 	while (ptr - buf < sz) {
-		uint32_t tmp = 0;
-		for (int i = 0 ; i < 4 ; i++)
-			tmp |= ((uint32_t)ptr[i] << ((3 - i) * 8));
-		local_checksum += tmp;
+		local_checksum += *((uint32_t*)ptr);
 		ptr += 4;
 	}
 	printf("local  checksum: ");
