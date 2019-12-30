@@ -1,4 +1,5 @@
-#include "inc/stm32l476xx.h"
+#include "inc/stm/stm32l476xx.h"
+#include "inc/io/usart.h"
 
 // use this pragma at handlers
 //#pragma thumb
@@ -6,6 +7,7 @@
 
 #define VTOR_BASE_ADDR ((uint32_t *)0x08080000U)
 
+uint32_t program_size = 0;
 uint8_t usart_buf[8192];
 int program_ready = 0;
 
@@ -47,53 +49,27 @@ void flash_write(uint32_t *data, uint32_t n) {
 void USART1_Handler() {
 	NVIC->ICPR[1] = 0x20;
 	NVIC->ICER[1] = 0x20;
-	uint32_t checksum = 0;
-	for(int i=4; i; i--) {
-		while(!(USART1->ISR & USART_ISR_RXNE));
-		uint8_t c = USART1->RDR;
-		checksum <<= 8;
-		checksum |= (uint32_t)c;
+	const uint32_t checksum = usart_receive_uint();
+	uint32_t checksum_self = 0;
+	uint32_t size = usart_receive_uint();
+	checksum_self += size;
+	uint32_t size_self = usart_receive(usart_buf + program_size, size);
+	if(size == size_self) {
+		checksum_self += usart_checksum(usart_buf + program_size, size);
 	}
-	uint32_t wait_cnt = 0, ptr = 0, checksum_self = 0;
-	while(1) {
-		if(USART1->ISR & USART_ISR_RXNE) {
-			wait_cnt = 0;
-			usart_buf[ptr++] = USART1->RDR;
-			if((ptr & 0x03) == 0) {
-				uint32_t delta = 0;
-				for(int i=4; i; i--) {
-					delta <<= 8;
-					delta |= (uint32_t)usart_buf[ptr-i];
-				}
-				checksum_self += delta;
-			}
+	usart_send_uint(checksum);
+	usart_send_uint(checksum_self);
+	if(checksum == checksum_self && size == size_self) {
+		program_size += size;
+		if(size == 0) {
+			flash_write((uint32_t *)usart_buf, program_size);
+			program_ready = 1;
+		} else {
+			NVIC->ISER[1] |= 0x20;
 		}
-		wait_cnt++;
-		if(wait_cnt > 8192) {
-			break;
-		}
-	}
-	/*
-	while(!(USART1->ISR & USART_ISR_TXE));
-	USART1->TDR = (uint8_t)(checksum_self & 0xFF);
-	checksum_self >>= 8;
-	while(!(USART1->ISR & USART_ISR_TXE));
-	USART1->TDR = (uint8_t)(checksum_self & 0xFF);
-	checksum_self >>= 8;
-	while(!(USART1->ISR & USART_ISR_TXE));
-	USART1->TDR = (uint8_t)(checksum_self & 0xFF);
-	checksum_self >>= 8;
-	while(!(USART1->ISR & USART_ISR_TXE));
-	USART1->TDR = (uint8_t)(checksum_self & 0xFF);
-	*/
-	if(checksum == checksum_self) {
-		while(!(USART1->ISR & USART_ISR_TXE));
-		USART1->TDR = '\0';
-		flash_write((uint32_t *)usart_buf, ptr);
-		program_ready = 1;
+		usart_send_uint(0);
 	} else {
-		while(!(USART1->ISR & USART_ISR_TXE));
-		USART1->TDR = 0x01;
+		usart_send_uint(1);
 		NVIC->ISER[1] |= 0x20;
 	}
 }
@@ -128,10 +104,13 @@ int main() {
 	flash_init();
 	USART_init();
 	NVIC_init();
+	program_ready = program_size = 0;
 	while(!program_ready);
 	uint32_t *new_vtor = VTOR_BASE_ADDR + 1;
 	void (*fn)() = *((void (**)())(new_vtor));
 	fn();
+	NVIC->ISER[1] |= 0x20;
+	NVIC->ICPR[1] = 0x20;
 	while(1);
 
 	return 0;

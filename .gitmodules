@@ -1,0 +1,3 @@
+[submodule "example/blockly"]
+	path = example/blockly
+	url = https://github.com/austin880625/STM32-Blockly.git
