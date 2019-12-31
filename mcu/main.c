@@ -1,75 +1,48 @@
 #include "inc/stm/stm32l476xx.h"
 #include "inc/io/usart.h"
+#include "inc/io/iapp.h"
 
 // use this pragma at handlers
 //#pragma thumb
 
-
-#define VTOR_BASE_ADDR ((uint32_t *)0x08080000U)
-
-uint32_t program_size = 0;
+uint32_t assembled_size = 0;
 uint8_t usart_buf[8192];
-int program_ready = 0;
+uint8_t usart_reply[128];
 
 void flash_init() {
 	FLASH->KEYR = 0x45670123;
 	FLASH->KEYR = 0xCDEF89AB;
 }
 
-void flash_write(uint32_t *data, uint32_t n) {
-	while(FLASH->SR & FLASH_SR_BSY);
-	FLASH->SR |= FLASH_SR_FASTERR | FLASH_SR_MISERR | FLASH_SR_PGSERR | FLASH_SR_SIZERR |
-		FLASH_SR_PGAERR | FLASH_SR_WRPERR | FLASH_SR_PROGERR;
-	FLASH->CR &= (~FLASH_CR_PER) & (~FLASH_CR_MER1) & (~FLASH_CR_MER2);
-	// Erase the desired region
-	uint32_t page = 256, n0 = n;
-	FLASH->CR |= FLASH_CR_PER;
-	do {
-		FLASH->CR = (FLASH->CR & 0xFFFFF807) | (page << 3);
-		FLASH->CR |= FLASH_CR_STRT;
-		while(FLASH->SR & FLASH_SR_BSY);
-	} while(n0 >>= 11);
-	FLASH->SR |= FLASH_SR_FASTERR | FLASH_SR_MISERR | FLASH_SR_PGSERR | FLASH_SR_SIZERR |
-		FLASH_SR_PGAERR | FLASH_SR_WRPERR | FLASH_SR_PROGERR;
-	FLASH->CR &= (~FLASH_CR_PER) & (~FLASH_CR_MER1) & (~FLASH_CR_MER2);
-
-	// Program sequence
-	uint32_t *dst_addr = VTOR_BASE_ADDR;
-	FLASH->CR |= FLASH_CR_PG;
-	for(int i=0; i<n; i-=-2) {
-		dst_addr[i] = data[i];
-		dst_addr[i+1] = data[i+1];
-		while(FLASH->SR & FLASH_SR_BSY);
-		FLASH->SR |= FLASH_SR_EOP;
-	}
-	FLASH->CR &= (~FLASH_CR_PG);
-}
-
 #pragma thumb
 void USART1_Handler() {
 	NVIC->ICPR[1] = 0x20;
 	NVIC->ICER[1] = 0x20;
-	const uint32_t checksum = usart_receive_uint();
+	struct packet_header_t header;
+	usart_recv((char *)&header, sizeof(struct packet_header_t));
+	//const uint32_t checksum = usart_recv_uint();
 	uint32_t checksum_self = 0;
-	uint32_t size = usart_receive_uint();
-	checksum_self += size;
-	uint32_t size_self = usart_receive(usart_buf + program_size, size);
-	if(size == size_self) {
-		checksum_self += usart_checksum(usart_buf + program_size, size);
+	//uint32_t size = usart_recv_uint();
+	checksum_self += header.size;
+	uint32_t size_self = usart_recv(usart_buf + assembled_size, header.size);
+	if(header.size == size_self) {
+		checksum_self += usart_checksum(usart_buf + assembled_size, header.size);
 	}
-	usart_send_uint(checksum);
-	usart_send_uint(checksum_self);
-	if(checksum == checksum_self && size == size_self) {
-		program_size += size;
-		if(size == 0) {
-			flash_write((uint32_t *)usart_buf, program_size);
-			program_ready = 1;
-		} else {
-			NVIC->ISER[1] |= 0x20;
+	//usart_send_uint(header.checksum);
+	//usart_send_uint(checksum_self);
+	if(header.checksum == checksum_self && header.size == size_self) {
+		assembled_size += header.size;
+		if(header.control & 0x02) {
+			usart_dispatch_pre_reply(0, usart_buf, assembled_size, usart_reply);
+			assembled_size = 0;
 		}
-		usart_send_uint(0);
+		usart_send_packet((struct packet_header_t *)usart_reply, usart_reply + sizeof(struct packet_header_t));
+		NVIC->ICPR[1] = 0x20;
+		NVIC->ISER[1] |= 0x20;
 	} else {
-		usart_send_uint(1);
+		struct packet_header_t reply = { .checksum = 0, .size = 0, .control = 1 };
+		usart_send_packet(&reply, 0);
+		NVIC->ICPR[1] = 0x20;
 		NVIC->ISER[1] |= 0x20;
 	}
 }
@@ -104,13 +77,15 @@ int main() {
 	flash_init();
 	USART_init();
 	NVIC_init();
-	program_ready = program_size = 0;
-	while(!program_ready);
+	struct usart_cb iapp_cb = {
+		.pre_reply = iapp_pre_reply,
+		.post_reply = iapp_post_reply
+	};
+	usart_register_cb(0, &iapp_cb);
+	while(!iapp_program_status());
 	uint32_t *new_vtor = VTOR_BASE_ADDR + 1;
 	void (*fn)() = *((void (**)())(new_vtor));
 	fn();
-	NVIC->ISER[1] |= 0x20;
-	NVIC->ICPR[1] = 0x20;
 	while(1);
 
 	return 0;
