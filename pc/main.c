@@ -1,77 +1,59 @@
 #include "pc.h"
+#include "iapp.h"
 
-#define MAX_LEN 65536
-#define MAX_PACKET 64
-int load_source(char *filename, uint8_t *buf, uint32_t *len) {
+#define MAX_SOURCE 8192
+
+size_t load_source(char *filename, uint8_t *source) {
 	FILE *src;
 	if (!(src = fopen(filename, "rb")))
-		return 1;
-	memset(buf, 0, sizeof(uint8_t) * MAX_LEN);
-	uint8_t *ptr = buf; 
-	*len = 0;
+		return 0;
+	memset(source, 0, sizeof(uint8_t) * MAX_SOURCE);
+	uint8_t *source_ptr = source; 
+	size_t source_size = 0;
 	while (1) {
-		size_t sz = fread(ptr, sizeof(uint8_t), 1024, src);
-		*len += sz;
-		if (sz != 1024)
+		size_t load_size = fread(source_ptr, sizeof(uint8_t), 1024, src);
+		source_size += load_size;
+		if (load_size != 1024)
 			break;
-		ptr += 1024;
+		source_ptr += 1024;
 	}
-	while (*len % 4) *len++;
+	while (source_size % 4) source_size++;
 	fclose(src);
-	return 0;
+	return source_size;
 }
-void print(uint32_t target) {
-	printf("%u (%u, %u, %u, %u)\n", target, (target >> 24) & 0xFF, (target >> 16) & 0xFF, (target >> 8) & 0xFF, target & 0xFF);
-}
-int cnt = 0;
-int send_packet(int fd, uint8_t *buf, uint32_t sz) {
-	printf("send packet %d(%d bytes)\n", cnt, sz);
-	uint8_t *ptr = buf;
-	uint32_t local_checksum = sz;
-	while (ptr - buf < sz) {
-		local_checksum += *((uint32_t*)ptr);
-		ptr += 4;
-	}
-	printf("local  checksum: ");
-	print(local_checksum);
-	send_int(fd, local_checksum);
-	send_int(fd, sz);
-	ptr = buf;
-	while (ptr - buf < sz)
-		send_byte(fd, *ptr), ptr++;
-	uint32_t return_checksum = receive_int(fd);
-	printf("return checksum: ");
-	print(return_checksum);
-	uint32_t remote_checksum = receive_int(fd);
-	printf("remote checksum: ");
-	print(remote_checksum);
-	uint32_t return_code = receive_int(fd);
-	printf("get return code: %u\n", return_code);
-	return return_code;
-}
-void send_source(int fd, char *filename) {
-	static uint8_t buf[MAX_LEN];
-	uint32_t len = 0;
-	if (load_source(filename, buf, &len)) {
+
+void upload(int fd, char *filename) {
+	uint8_t source[MAX_SOURCE];
+	size_t source_size;
+	if (!(source_size = load_source(filename, source))) {
 		printf("Open source file error!\n");
 		exit(1);
 	}
-	uint8_t *ptr = buf;
-	while (ptr - buf < len) {
-		while (send_packet(fd, ptr, MAX_PACKET)) {
-			printf("Corrupted, trying to resend\n\n\n");
-		}
-		cnt++;
-		printf("Code is correct\n\n\n");
-		ptr += MAX_PACKET;
-	}
-	while (send_packet(fd, ptr, 0))
-		printf("Last Corrupted, trying to resend\n\n\n");
-	printf("Last Code is correct\n\n\n");
+	dump("upload source file", source, source_size);
+	struct iapp_header_t iapp_header = {
+		.command = UPLOAD
+	};
+	uint8_t recv_payload[MAX_SOURCE];
+	size_t recv_payload_size = iapp(fd, &iapp_header, source, source_size, recv_payload);
+	dump("recv payload", recv_payload, recv_payload_size);
+}
+
+void get(int fd) {
+	struct iapp_header_t iapp_header = {
+		.command = GET
+	};
+	uint8_t iapp_payload[] = "Hello World!!";
+	size_t iapp_payload_size = sizeof(iapp_payload);
+	uint8_t recv_payload[512];
+	size_t recv_payload_size = iapp(fd, &iapp_header, iapp_payload, iapp_payload_size, recv_payload);
+
+	printf("recv_payload_size: %lu\n", recv_payload_size);
+	printf("recv_payload: %s\n", (char*)recv_payload);
 }
 
 int main(int argc, char **argv) {
 	int fd = connect(argc, argv);
-	send_source(fd, argv[1]);
+	upload(fd, argv[1]);
+	// get(fd);
 	disconnect(fd);
 }

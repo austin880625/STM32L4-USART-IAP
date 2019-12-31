@@ -23,7 +23,17 @@ void termios_init(int fd) {
 	options.c_cflag &= ~PARENB;
 	options.c_cflag &= ~CSTOPB;
 	options.c_cflag &= ~CSIZE;
+	options.c_cflag &= ~HUPCL;
 	options.c_cflag |= CS8;
+
+//	options.c_iflag = 1030;
+//	options.c_oflag = 0;
+//	options.c_cflag = 2237;
+//	options.c_lflag = 35376;
+//	options.c_lflag &= ~ISIG;
+	options.c_lflag &= ~ICANON;
+	options.c_lflag &= ~ECHO;
+
 
 	tcsetattr(fd, TCSANOW, &options);
 
