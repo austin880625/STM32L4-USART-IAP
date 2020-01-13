@@ -4,7 +4,7 @@
 //#pragma thumb
 
 void delay() {
-	int cnt = 1000000;
+	int cnt = 100000;
 	while(cnt--);
 }
 

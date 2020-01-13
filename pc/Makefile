@@ -13,4 +13,4 @@ clean:
 	rm -f $(OBJ_FILES) pc.out
 
 test:
-	make && ./pc.out ../example/main.bin /dev/ttyUSB0 && make clean
+	make && ./pc.out /dev/ttyUSB0 && make clean
