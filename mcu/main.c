@@ -82,11 +82,15 @@ int main() {
 		.post_reply = iapp_post_reply
 	};
 	usart_register_cb(0, &iapp_cb);
-	while(!iapp_program_status());
-	uint32_t *new_vtor = VTOR_BASE_ADDR + 1;
-	void (*fn)() = *((void (**)())(new_vtor));
-	fn();
-	while(1);
+	while(1) {
+		int command = iapp_get_command();
+		if(command == IAPP_GET) {
+		} else if(command == IAPP_RUN && iapp_program_status()) {
+			uint32_t *new_vtor = VTOR_BASE_ADDR + 1;
+			void (*fn)() = *((void (**)())(new_vtor));
+			fn();
+		}
+	}
 
 	return 0;
 }

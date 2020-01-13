@@ -1,7 +1,15 @@
 #include "iapp.h"
 #include "usart.h"
 
-static int program_ready = 0;
+struct iapp_state_t {
+	int program_ready;
+	int command;
+};
+
+static struct iapp_state_t iapp_state = {
+	.program_ready = 0,
+	.command = 0
+};
 
 void flash_write(uint32_t *data, uint32_t n) {
 	while(FLASH->SR & FLASH_SR_BSY);
@@ -39,14 +47,29 @@ void iapp_pre_reply(uint8_t *data, uint32_t size, uint8_t *reply) {
 	uint8_t *payload = reply + sizeof(struct packet_header_t);
 	uint32_t reply_size;
 
-	if(iapp->command == 1) {
+	iapp_state.command = iapp->command;
+	if(iapp->command == IAPP_GET) {
 		reply_size = size-sizeof(struct iapp_header_t);
 		for(int i=0; i<reply_size; i++) {
 			payload[i] = data[i];
 		}
-	} else if(iapp->command == 4) {
+	} else if(iapp->command == IAPP_RESET) {
+		SCB->AIRCR |= SCB_AIRCR_SYSRESETREQ_Msk;
+	} else if(iapp->command == IAPP_RUN) {
+		if(iapp_state.program_ready == 0) {
+			reply_size = 3;
+			payload[0] = 'N';
+			payload[1] = 'O';
+			payload[2] = '\0';
+		} else {
+			reply_size = 3;
+			payload[0] = 'O';
+			payload[1] = 'K';
+			payload[2] = '\0';
+		}
+	} else if(iapp->command == IAPP_UPLOAD) {
 		flash_write((uint32_t *)data, size);
-		program_ready = 1;
+		iapp_state.program_ready = 1;
 		reply_size = 3;
 		payload[0] = 'O';
 		payload[1] = 'K';
@@ -55,6 +78,7 @@ void iapp_pre_reply(uint8_t *data, uint32_t size, uint8_t *reply) {
 	while((reply_size&0x11))payload[reply_size++] = '\0';;
 	reply_header->checksum = usart_checksum(payload, reply_size) + reply_size;
 	reply_header->size = reply_size;
+	// 0x02 ==> the last packet
 	reply_header->control = 0x02;
 }
 
@@ -62,5 +86,9 @@ void iapp_post_reply(uint8_t *data, uint32_t size) {
 }
 
 int iapp_program_status() {
-	return program_ready;
+	return iapp_state.program_ready;
+}
+
+int iapp_get_command() {
+	return iapp_state.command;
 }
