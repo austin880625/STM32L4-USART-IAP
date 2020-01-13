@@ -58,6 +58,8 @@ size_t iapp(int fd, struct iapp_header_t *send_iapp_header, uint8_t *send_iapp_p
 //			printf("recv packet #%d\n", packet_stamp);
 			recv_packet(fd, &recv_packet_header, recv_packet_payload);
 
+            if (recv_packet_header.checksum != cal_checksum(recv_packet_payload, recv_packet_header.size))
+                continue;
 			if ((recv_packet_header.control & 0x1))
 				continue;
 			send_packet_payload_ptr += MAX_PACKET;

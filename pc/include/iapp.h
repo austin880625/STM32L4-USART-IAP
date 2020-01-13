@@ -11,6 +11,7 @@
 #define RUN		2
 #define RESET	3
 #define UPLOAD	4
+#define SET     5
 
 struct __attribute__((__packed__)) iapp_header_t {
 	uint32_t command;
