@@ -35,8 +35,16 @@ void USART1_Handler() {
 		if(header.control & 0x02) {
 			usart_dispatch_pre_reply(0, usart_buf, assembled_size, usart_reply);
 			assembled_size = 0;
+			usart_send_packet((struct packet_header_t *)usart_reply, usart_reply + sizeof(struct packet_header_t));
+			if(iapp_get_command() == IAPP_RESET) {
+				int d = 2048;
+				while(d--);
+				SCB->AIRCR = ((0x5FA << 16) | SCB_AIRCR_SYSRESETREQ_Msk);
+			}
+		} else {
+			struct packet_header_t reply = { .checksum = 0, .size = 0, .control = 0 };
+			usart_send_packet(&reply, 0);
 		}
-		usart_send_packet((struct packet_header_t *)usart_reply, usart_reply + sizeof(struct packet_header_t));
 		NVIC->ICPR[1] = 0x20;
 		NVIC->ISER[1] |= 0x20;
 	} else {
@@ -82,12 +90,17 @@ int main() {
 		.post_reply = iapp_post_reply
 	};
 	usart_register_cb(0, &iapp_cb);
+	uint32_t *new_vtor = VTOR_BASE_ADDR + 1;
+	void (*fn)() = *((void (**)())(new_vtor));
+	uint32_t option = *(OPTION_ADDR);
+	int cut_through = ((option & 0x01) == 0);
+	if((option & 0x02) == 0) {
+		iapp_set_program_status(1);
+	}
 	while(1) {
 		int command = iapp_get_command();
 		if(command == IAPP_GET) {
-		} else if(command == IAPP_RUN && iapp_program_status()) {
-			uint32_t *new_vtor = VTOR_BASE_ADDR + 1;
-			void (*fn)() = *((void (**)())(new_vtor));
+		} else if(( (command == IAPP_RUN) || cut_through) && iapp_get_program_status()) {
 			fn();
 		}
 	}
