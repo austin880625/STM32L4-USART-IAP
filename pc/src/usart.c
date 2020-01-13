@@ -34,7 +34,6 @@ void termios_init(int fd) {
 	options.c_lflag &= ~ICANON;
 	options.c_lflag &= ~ECHO;
 
-
 	tcsetattr(fd, TCSANOW, &options);
 
 	fcntl(fd, F_SETFL, 0);

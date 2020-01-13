@@ -21,24 +21,46 @@ size_t load_source(char *filename, uint8_t *source) {
 	fclose(src);
 	return source_size;
 }
-
-void upload(int fd, char *filename) {
+void send_reset(int fd) {
+    struct iapp_header_t iapp_header = {
+        .command = RESET
+    };
+    uint8_t recv_payload[MAX_SOURCE];
+    uint8_t buf[MAX_SOURCE];
+    memset(buf, 0, sizeof(buf));
+    size_t recv_payload_size = iapp(fd, &iapp_header, buf, 0, recv_payload);
+    dump("recv payload", recv_payload, 0, recv_payload_size);
+}
+void send_run(int fd) {
+    struct iapp_header_t iapp_header = {
+        .command = RUN
+    };
+    uint8_t recv_payload[MAX_SOURCE];
+    uint8_t buf[MAX_SOURCE];
+    memset(buf, 0, sizeof(buf));
+    size_t recv_payload_size = iapp(fd, &iapp_header, buf, 0, recv_payload);
+    dump("recv payload", recv_payload, 0, recv_payload_size);
+    if (!strncmp(recv_payload, "NO", 2))
+        puts("The code on the mcu is corrupt!");
+    else
+        puts("The mcu is running!");
+}
+void send_upload(int fd, char *filename) {
 	uint8_t source[MAX_SOURCE];
 	size_t source_size;
 	if (!(source_size = load_source(filename, source))) {
 		printf("Open source file error!\n");
-		exit(1);
+		return ;
 	}
-	dump("upload source file", source, source_size);
 	struct iapp_header_t iapp_header = {
 		.command = UPLOAD
 	};
 	uint8_t recv_payload[MAX_SOURCE];
 	size_t recv_payload_size = iapp(fd, &iapp_header, source, source_size, recv_payload);
-	dump("recv payload", recv_payload, recv_payload_size);
+	dump("recv payload", recv_payload, 0, recv_payload_size);
 }
 
-void get(int fd) {
+void send_get(int fd) {
 	struct iapp_header_t iapp_header = {
 		.command = GET
 	};
@@ -50,10 +72,39 @@ void get(int fd) {
 	printf("recv_payload_size: %lu\n", recv_payload_size);
 	printf("recv_payload: %s\n", (char*)recv_payload);
 }
-
+void help() {
+    printf("\thelp\t\t\tPrint this message\n");
+    printf("\treset\t\t\tReset mcu\n");
+    printf("\tupload <filename>\tUpload binary file to mcu\n");
+    printf("\trun\t\t\tStart the code on the mcu\n");
+    printf("\tget\t\t\tGet code information on the mcu\n");
+}
 int main(int argc, char **argv) {
 	int fd = connect(argc, argv);
-	upload(fd, argv[1]);
-	// get(fd);
+	while (1) {
+		printf("> ");
+		char op[128];
+		fgets(op, 128, stdin);
+		char *ptr = strtok(op, " \n");
+		if (!ptr)
+			continue;
+        if (!strncmp(ptr, "help", 4)) {
+            help();
+        } else if (!strncmp(ptr, "upload", 6)) {
+			ptr = strtok(NULL, " \n");
+			send_upload(fd, ptr);
+        } else if (!strncmp(ptr, "reset", 5)) {
+            send_reset(fd);
+        } else if (!strncmp(ptr, "run", 3)) {
+            send_run(fd);
+        } else if (!strncmp(ptr, "get", 3)) {
+            send_get(fd);
+		} else if (!strncmp(ptr, "q", 1)) {
+			exit(0);
+		} else goto end;
+		continue;
+end:;
+		printf("command not found\n");
+	}
 	disconnect(fd);
 }
