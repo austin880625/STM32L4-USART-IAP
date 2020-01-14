@@ -87,40 +87,50 @@ void help() {
     printf("\trun\t\t\tStart the code on the mcu\n");
     printf("\tget\t\t\tGet code information on the mcu\n");
     printf("\tset\t\t\tSet execution options on reset\n");
-    printf("\t\t\t\t0: run the program after reset immediately\n");
-    printf("\t\t\t\t1: run the program after the \"run\" command\n");
+    printf("\t\t\t\t0: run the program after the \"run\" command\n");
+    printf("\t\t\t\t1: run the program after reset immediately\n");
 }
 int main(int argc, char **argv) {
 	int fd = connect(argc, argv);
-	while (1) {
-		printf("> ");
-		char op[128];
-		fgets(op, 128, stdin);
-		char *ptr = strtok(op, " \n");
-		if (!ptr)
-			continue;
-        if (!strncmp(ptr, "help", 4)) {
-            help();
-        } else if (!strncmp(ptr, "upload", 6)) {
-			ptr = strtok(NULL, " \n");
-			send_upload(fd, ptr);
-        } else if (!strncmp(ptr, "reset", 5)) {
-            send_reset(fd);
-        } else if (!strncmp(ptr, "run", 3)) {
-            send_run(fd);
-        } else if (!strncmp(ptr, "get", 3)) {
-            send_get(fd);
-        } else if (!strncmp(ptr, "set", 3)) {
-            ptr = strtok(NULL, " \n");
-            uint32_t value;
-            sscanf(ptr, "%u", &value);
-            send_set(fd, value);
-		} else if (!strncmp(ptr, "q", 1)) {
-			exit(0);
-		} else goto end;
-		continue;
-end:;
-		printf("command not found\n");
-	}
+    if (argc == 2) {
+        while (1) {
+            printf("> ");
+            char op[128];
+            fgets(op, 128, stdin);
+            char *ptr = strtok(op, " \n");
+            if (!ptr)
+                continue;
+            if (!strncmp(ptr, "help", 4)) {
+                help();
+            } else if (!strncmp(ptr, "upload", 6)) {
+                ptr = strtok(NULL, " \n");
+                send_upload(fd, ptr);
+            } else if (!strncmp(ptr, "reset", 5)) {
+                send_reset(fd);
+            } else if (!strncmp(ptr, "run", 3)) {
+                send_run(fd);
+            } else if (!strncmp(ptr, "get", 3)) {
+                send_get(fd);
+            } else if (!strncmp(ptr, "set", 3)) {
+                ptr = strtok(NULL, " \n");
+                uint32_t value;
+                sscanf(ptr, "%u", &value);
+                send_set(fd, value);
+            } else if (!strncmp(ptr, "q", 1)) {
+                exit(0);
+            } else goto end;
+            continue;
+    end:;
+            printf("command not found\n");
+        }
+    } else if (argc == 3) {
+        int op;
+        sscanf(argv[2], "%d", &op);
+        switch(op) {
+            case UPLOAD:
+                send_upload(fd, "../example/blockly/upload_dir/main.bin");
+                break;
+        }
+    }
 	disconnect(fd);
 }
