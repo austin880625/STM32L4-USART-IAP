@@ -36,9 +36,9 @@ void USART1_Handler() {
 			usart_dispatch_pre_reply(0, usart_buf, assembled_size, usart_reply);
 			assembled_size = 0;
 			usart_send_packet((struct packet_header_t *)usart_reply, usart_reply + sizeof(struct packet_header_t));
+			int d = 2048;
+			while(d--);
 			if(iapp_get_command() == IAPP_RESET) {
-				int d = 2048;
-				while(d--);
 				SCB->AIRCR = ((0x5FA << 16) | SCB_AIRCR_SYSRESETREQ_Msk);
 			}
 		} else {
@@ -78,6 +78,7 @@ void USART_init() {
 void NVIC_init() {
 	// NVIC_EnableIRQ(USART1_IRQn);
 	NVIC->ISER[1] = 0x20;
+	NVIC_SetPriority(37, 2);
 }
 
 int main() {
@@ -93,7 +94,7 @@ int main() {
 	uint32_t *new_vtor = VTOR_BASE_ADDR + 1;
 	void (*fn)() = *((void (**)())(new_vtor));
 	uint32_t option = *(OPTION_ADDR);
-	int cut_through = ((option & 0x01) == 0);
+	int cut_through = ((option & 0x01) == 1);
 	if((option & 0x02) == 0) {
 		iapp_set_program_status(1);
 	}
@@ -101,6 +102,7 @@ int main() {
 		int command = iapp_get_command();
 		if(command == IAPP_GET) {
 		} else if(( (command == IAPP_RUN) || cut_through) && iapp_get_program_status()) {
+			SCB->VTOR = (0x80000 << 0);
 			fn();
 		}
 	}
