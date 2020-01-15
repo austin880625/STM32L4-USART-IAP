@@ -28,7 +28,7 @@ void print_progress(int a, int b) {
 void dump_iapp(struct iapp_header_t *send_iapp_header, uint8_t *send_iapp_payload, size_t send_iapp_payload_size) {
 	size_t buf_size = sizeof(struct iapp_header_t) + send_iapp_payload_size;
 	uint8_t *buf = concat((uint8_t*)send_iapp_header, sizeof(struct iapp_header_t), send_iapp_payload, send_iapp_payload_size);
-	dump("iapp", buf, sizeof(struct iapp_header_t), send_iapp_payload_size);
+	dump(stderr, "iapp", buf, sizeof(struct iapp_header_t), send_iapp_payload_size);
 	free(buf);
 }
 
