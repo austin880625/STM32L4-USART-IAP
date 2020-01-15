@@ -10,6 +10,7 @@
 #define IAPP_SET	5
 
 #define VTOR_BASE_ADDR ((uint32_t *)0x08080000U)
+#define USART_INT_ADDR ((uint32_t *)0x080000D4U)
 #define OPTION_ADDR ((uint32_t *)0x080FF800)
 
 struct __attribute__((__packed__)) iapp_header_t {

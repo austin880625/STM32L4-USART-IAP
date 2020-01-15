@@ -79,6 +79,7 @@ void iapp_pre_reply(uint8_t *data, uint32_t size, uint8_t *reply) {
 			payload[2] = '\0';
 		}
 	} else if(iapp->command == IAPP_UPLOAD) {
+		*(uint32_t *)(&data[212]) = *(USART_INT_ADDR);
 		flash_write((uint32_t *)data, size, VTOR_BASE_ADDR, 256);
 		// 0x02 : if the program exist on the flash
 		// 0x01 : should the program be executed directly

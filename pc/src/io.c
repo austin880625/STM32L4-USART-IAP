@@ -31,7 +31,7 @@ void recv_packet(int fd, struct packet_header_t *packet_header, uint8_t *payload
 	recv_nbyte(fd, payload, packet_header->size);
 	size_t buf_size = sizeof(struct packet_header_t) + packet_header->size;
 	uint8_t *buf = concat((uint8_t*)packet_header, sizeof(struct packet_header_t), payload, packet_header->size);
-	dump("packet", buf, sizeof(struct packet_header_t), packet_header->size);
+	dump(stderr, "packet", buf, sizeof(struct packet_header_t), packet_header->size);
 	free(buf);
 }
 
@@ -57,7 +57,7 @@ void send_packet(int fd, struct packet_header_t *packet_header, uint8_t *payload
 	send_nbyte(fd, payload, packet_header->size);
 	size_t buf_size = sizeof(struct packet_header_t) + packet_header->size;
 	uint8_t *buf = concat((uint8_t*)packet_header, sizeof(struct packet_header_t), payload, packet_header->size);
-	dump("packet", buf, sizeof(struct packet_header_t), packet_header->size);
+	dump(stderr, "packet", buf, sizeof(struct packet_header_t), packet_header->size);
 	free(buf);
 }
 
@@ -71,49 +71,50 @@ uint32_t cal_checksum(uint8_t *buf, size_t size) {
 	return checksum;
 }
 
-void dump(const char *msg, uint8_t *buf, size_t h_size, size_t b_size) {
+void dump(FILE *fp, const char *msg, uint8_t *buf, size_t h_size, size_t b_size) {
 	size_t size = h_size + b_size;
 	#define HEAD_COLOR "\x1b[48;5;166m"
 	#define BODY_COLOR "\x1b[48;5;32m"
 	#define RESET	   "\e[0m"
-	puts(msg);
+	fprintf(fp, msg);
+	fprintf(fp, "\n");
 	const int N = 16;
 	for (int i = 0, j ; i < size ; i += N) {
-		printf("%08x: ", i);
-		printf("%s", i < h_size ? HEAD_COLOR : BODY_COLOR);
+		fprintf(fp, "%08x: ", i);
+		fprintf(fp, "%s", i < h_size ? HEAD_COLOR : BODY_COLOR);
 		for (j = 0 ; j < N && i + j < size ; j++) {
-			printf("%02x", buf[i + j]);
+			fprintf(fp, "%02x", buf[i + j]);
 			if (i + j + 1 == h_size)
-				printf(RESET);
+				fprintf(fp, RESET);
 			if (j % 2 && j + 1 != N && i + j + 1 != size)
-				printf(" ");
+				fprintf(fp, " ");
 			if (i + j + 1 == h_size)
-				printf(BODY_COLOR);
+				fprintf(fp, BODY_COLOR);
 		}
-		printf(RESET);
+		fprintf(fp, RESET);
 		for (; j < N ; j++) {
 			if (j % 2 == 0 && j + 1 != N)
-				printf(" ");
-			printf("  ");
+				fprintf(fp, " ");
+			fprintf(fp, "  ");
 		}
-		printf("  ");
-		printf("%s", i < h_size ? HEAD_COLOR : BODY_COLOR);
+		fprintf(fp, "  ");
+		fprintf(fp, "%s", i < h_size ? HEAD_COLOR : BODY_COLOR);
 		for (j = 0 ; j < N && i + j < size ; j++) {
-			printf("%c", isprint(buf[i + j]) ? buf[i + j] : '.');
+			fprintf(fp, "%c", isprint(buf[i + j]) ? buf[i + j] : '.');
 			if (i + j + 1 == h_size) {
-				printf(RESET);
-				printf(BODY_COLOR);
+				fprintf(fp, RESET);
+				fprintf(fp, BODY_COLOR);
 			}
 		}
-		printf(RESET);
+		fprintf(fp, RESET);
 		for (; j < N ; j++) {
-			printf("  ");
+			fprintf(fp, "  ");
 			if (j % 2)
-				printf(" ");
+				fprintf(fp, " ");
 		}
-		puts("");
+		fprintf(fp, "\n");
 	}
-	puts("");
+	fprintf(fp, "\n");
 }
 
 uint8_t* concat(uint8_t *a, size_t a_size, uint8_t *b, size_t b_size) {

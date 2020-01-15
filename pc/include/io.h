@@ -25,7 +25,7 @@ void send_packet_header(int, struct packet_header_t*);
 void send_packet(int, struct packet_header_t*, uint8_t*);
 
 uint32_t cal_checksum(uint8_t*, size_t);
-void dump(const char*, uint8_t *, size_t, size_t);
+void dump(FILE *fp, const char*, uint8_t *, size_t, size_t);
 uint8_t* concat(uint8_t*, size_t, uint8_t*, size_t);
 
 #endif
